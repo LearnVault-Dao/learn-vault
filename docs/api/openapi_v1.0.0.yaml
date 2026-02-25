@@ -1,0 +1,565 @@
+openapi: 3.0.0
+
+info:
+  version: 1.0.0
+  title: LearnVault API
+  description: |
+    LearnVault is a decentralized learn-and-earn paltform. All protected endpoints require a Bearer JWT access token.
+
+servers:
+  - url: https://api.example.com
+    description: Production Server (example)
+  - url: https://localhost.example:3000
+    description: Local dev (example)
+
+externalDocs:
+  description: LearnVault README
+  url: https://github.com/btwn-sw/learnvault
+
+tags:
+  - name: Auth
+  - name: Learner
+  - name: Courses
+  - name: Milestones
+  - name: Treasury
+  - name: Proposals
+  - name: Escrow
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/connect-wallet:
+    post:
+      tags: [Auth]
+      summary: Authenticate via wallet signature
+      description: |
+        Verifies a signed message and issues an access token.
+      security: []
+      requestBody:
+          required: true
+          content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ConnectWalletRequest"
+                example:
+                  address: "Example_StellaAddress"
+                  message: "Sign in to LearnVault at 2026-02-25T12:00:00+09:00"
+                  signature: "9zscft...signature"
+                  chain: "stellar"
+      responses:
+        "200":
+          description: Successfully Authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokens'
+              example:
+                accessToken: "user_token"
+                refreshToken: "user_refresh_token"
+                expiresIn: 3600
+                tokenType: "Bearer"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh session token
+      description: |
+        Exchanges a refresh token for a new access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+            example:
+              refreshToken: "user_refresh_token"
+      responses:
+        "200":
+          description: Successfully Refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshRequest'
+              example:
+                accessToken: "user_token"
+                refreshToken: "user_refresh_token"
+                expiresIn: 3600
+                tokenType: "Bearer"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /learner/{address}:
+    get:
+      tags: [Learner]
+      summary: Fetch learner profile and LRN balance.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LearnerAddress'
+      responses:
+        "200":
+          description: Learner profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerProfile'
+              example:
+                address: "Example_StellaAddress"
+                displayName: "John Lee"
+                lrnBalance: "1250"
+                joinedAt: "2026-01-10T09:00:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+  
+  /learner/{address}/progress:
+    get:
+      tags: [Learner]
+      summary: Course progress per learner
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LearnerAddress'
+      responses:
+        "200":
+          description: Successfully listed progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LearnerCourseProgress'
+              example:
+                learnerAddress: "Example_StellaAddress"
+                courses:
+                  - courseId: "course1-101"
+                    enrolledAt: "2026-02-01T10:00:00Z"
+                    completedMilestones: 3
+                    totlaMilestones: 8
+                    lastUpdatedAt: "2026-02-24T12:00:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+  
+  /learner/{address}/proposals:
+    get: {}
+  
+  /proposals:
+    get:
+      tags: [Proposals]
+      summary: List all scholarship proposals
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Status'
+      responses:
+        "200":
+          description: Successfully listed proposal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalList'
+              example:
+                items:
+                  - id: "prop_001"
+                    scholarAddress: "Example_StellaAddress"
+                    title: "ZZ Bootcamp"
+                    requestedUsdc: "500"
+                    status: "VOTING"
+                    createdAt: "2026-02-20T12:00:00Z"
+                nextCursor: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+
+
+
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
+  parameters:
+    LearnerAddress:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Laerner wallet address (e.g., Stellar publich key)
+
+    ScholarAddress:
+      name: scholarAddress
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Scholar wallet address (e.g., Stellar public key)
+    
+    Status:
+      name: status
+      in: query
+      required: false
+      description: Filter by proposal status
+      schema:
+        $ref: '#/components/schemas/ProposalStatus'
+      example: "VOTING"
+
+    Cursor:
+      name: cursor
+      in: path
+      required: false
+      schema:
+        type: string
+        nullable: true
+      description: Pagination cursor
+    
+    PageSize:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        description: Page size
+
+
+  schemas:  
+    # ---- Commom ----
+    StatusCodeResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, status, message, details, requestId]
+          properties:
+            code:
+              type: integer
+              example: "400"
+            status:
+              type: string
+              example: "Bad Request"
+            message:
+              type: string
+              example: "The request body is missing or invalid."
+            details:
+              type: object
+              additionalProperties: true
+              example: {}
+            requestId:
+              type: string
+              example: "req_1x2y3z"
+          example:
+            code: 400
+            status: "Bad Reqeust"
+            message: "The request body is missing or invalid."
+            details:
+              field: "requestedUsdc"
+              reason: "Must be a positive number."
+            requestId: "req_111xyz"
+
+    # ---- Auth ----
+    ConnectWalletRequest:
+      type: object
+      required: [address, message, signature]
+      properties:
+        address:
+          type: string
+        message:
+          type: string
+        signature:
+          type: string
+        chain:
+          type: string
+          description: Blockchain network identifier
+          example: "Bearer"
+    
+    AuthTokens:
+      type: object
+      required: [accessToken, refreshToken, expiresIn, tokenType]
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          example: 3600
+        tokenType: 
+          type: string
+          example: Bearer
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          example: "user_refresh_token"
+
+    # ---- Learner ----
+    LearnerProfile:
+      type: object
+      required: [address, lrnBalance, joinedAt]
+      properties:
+        address:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        lrnBalance:
+          type: string
+          description: LRN token balance as a string
+        joinedAt:
+          type: string
+          format: date-time
+
+    LearnerCourseProgress:
+      type: object
+      required: [courseId, enrolledAt, completedMilestones, totlaMilestones, lastUpdatedAt]
+      properties:
+        courseId:
+          type: string
+        enrolledAt:
+          type: string
+          format: date-time
+        completedMilestones:
+          type: integer
+        totalMilestones:
+          type: integer
+        lastUpdatedAt:
+          type: string
+          format: date-time
+    
+    # ---- Proposals ----
+    ProposalStatus:
+      type: string
+      enum: [DRAFT, VOTING, APPROVED, REJECTED, DISBURSED, CLOSED]
+    
+    ProposalList:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProposalSummary'
+        nextCursor:
+          type: string
+          nullable: true
+
+    ProposalSummary:
+      type: object
+      required: [id, scholarAddress, title, requestedUsdc, status, createdAt]
+      properties:
+        id:
+          type: string
+        scholarAddress:
+          type: string
+        title: 
+          type: string
+        requestedUsdc:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProposalStatus'
+        createdAt:
+          type: string
+          format: date-time
+
+
+    Proposal:
+      type: object
+      required: [id, scholarAddress, title, goal, requestedUsdc, status, createdAt]
+      properties:
+        id:
+          type: string
+        scholarAddress:
+          type: string
+        title:
+          type: string
+        goal:
+          type: string
+        requestedUsdc:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProposalStatus'
+        createdAt:
+          type: string
+          format: date-time
+        reputation:
+          $ref: '#/components/schemas/ProposalReputation'
+        timeline:
+          $ref: '#/components/schemas/ProposalTimeline'
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProposalMilestone'
+        votes:
+          $ref: '#/components/schemas/VoteTally'
+        voting:
+          $ref: '#/components/schemas/VotingParams'
+
+
+    
+    ProposalReputation:
+      type: object
+      properties:
+        lrnBalance:
+          type: string
+    ProposalTimeline:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+    ProposalMilestone:
+      type: object
+      required: [title, expectedDate, amountUsdc]
+      properties:
+        title:
+          type: string
+        expectedDate:
+          type: string
+          format: date
+        amountUsdc:
+          type: string
+    VoteTally:
+      type: object
+      properties:
+        yes:
+          type: string
+          description: Total YES voting weight
+        no:
+          type: string
+          description: Totla NO voting weight
+    VotingParams:
+      type: object
+      properties:
+        endsAt:
+          type: string
+          format: date-time
+        quorum:
+          type: string
+        approvalThreshold:
+          type: string
+          description: Decimal fraction as string (e.g., "0.6")
+
+  
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema: 
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 400
+            status: "Bad Reqeust"
+            message: "The request body is missing or invalid."
+            details:
+              field: "requestedUsdc"
+              reason: "Must be a positive number."
+            requestId: "req_111xyz"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema: 
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 401
+            status: "Unauthorized"
+            message: "Authentication token is missing or invalid."
+            details: {}
+            requestId: "req_222xyz"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 403
+            status: "Forbidden"
+            message: "The user is not authorized to perform."
+            details: {}
+            requestId: "req_333xyz"
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 404
+            status: "Not Found"
+            message: "Resource does not exist."
+            details: {}
+            requestId: "req_444xyz"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 409
+            status: "Conflict"
+            message: "Request conflicts with current state."
+            details:
+              reason: "Already enrolled."
+            requestId: "req_555xyz"
+    RateLimited:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 429
+            status: "Too Many Requests"
+            message: "Too many requests received. Please retry later."
+            details:
+              retryAfterSeconds: 30
+            requestId: "req_666xyz"
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StatusCodeResponse'
+          example:
+            code: 500
+            status: "Internal Server Error"
+            message: "Something went wrong on internal server."
+            details: {}
+            requestId: "req_777xyz"
