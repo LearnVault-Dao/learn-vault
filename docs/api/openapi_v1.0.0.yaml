@@ -1,8 +1,8 @@
 openapi: 3.0.0
 
 info:
-  version: 1.0.0
   title: LearnVault API
+  version: 1.0.0
   description: |
     LearnVault is a decentralized learn-and-earn paltform. All protected endpoints require a Bearer JWT access token.
 
@@ -10,7 +10,7 @@ servers:
   - url: https://api.example.com
     description: Production Server (example)
   - url: https://localhost.example:3000
-    description: Local dev (example)
+    description: Local Dev Server (example)
 
 externalDocs:
   description: LearnVault README
@@ -29,6 +29,7 @@ security:
   - bearerAuth: []
 
 paths:
+  # ==== AUTH ====
   /auth/connect-wallet:
     post:
       tags: [Auth]
@@ -99,7 +100,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "429":
           $ref: '#/components/responses/RateLimited'
-
+  
+  # ==== LEARNER ====
   /learner/{address}:
     get:
       tags: [Learner]
@@ -110,7 +112,7 @@ paths:
         - $ref: '#/components/parameters/LearnerAddress'
       responses:
         "200":
-          description: Learner profile
+          description: Successfully Retrieved Learner Profile.
           content:
             application/json:
               schema:
@@ -137,11 +139,11 @@ paths:
         - $ref: '#/components/parameters/LearnerAddress'
       responses:
         "200":
-          description: Successfully listed progress.
+          description: Successfully Listed Progress.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LearnerCourseProgress'
+                $ref: '#/components/schemas/LearnerProgressResponse'
               example:
                 learnerAddress: "Example_StellaAddress"
                 courses:
@@ -158,8 +160,277 @@ paths:
           $ref: '#/components/responses/RateLimited'
   
   /learner/{address}/proposals:
-    get: {}
+    get: 
+      tags: [Learner]
+      summary: Scholarship proposals submitted
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LearnerAddress'
+      responses:
+        "200":
+          description: Successfully Listed Proposal For Learner.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalList'
+              example:
+                items:
+                  - id: "prop_001"
+                    scholarAddress: "Example_StellaAddress"
+                    title: "AZ Bootcamp Tuition"
+                    requestedUsdc: "500"
+                    status: "VOTING"
+                    createdAt: "2026-02-20T12:00:00Z"
+                nextCursor: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
   
+  # ==== COURSES ====
+  /courses:
+    get:
+      tags: [Courses]
+      summary: List all available courses
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Successfully Listed Courses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseList'
+              example:
+                items:
+                  - id: "web1-101"
+                    title: "Web1 Foundations"
+                    description: "Wallets, transactions, and basics."
+                    totalMilestones: 8
+                  - id: "solidity-301"
+                    title: "Smart Contract Engineering"
+                    description: "Solidity fundamentals and security."
+                    totalMilestones: 10
+                nextCursor: null
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /courses/{id}:
+    get:
+      tags: [Courses]
+      summary: Course details and milestones
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      responses:
+        "200":
+          description: Successfully Retrieved Course Detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+              example:
+                id: "web1-101"
+                title: "Web1 Foundations"
+                description: "Wallets, transactions, and basics."
+                milestones:
+                  - milestoneId: "mile_001"
+                    title: "Web1 Foundations"
+                    lrnReward: "100"
+                  - milestoneId: "mile_002"
+                    title: "First transaction"
+                    lrnReward: "150"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /courses/{id}/enroll:
+    post:
+      tags: [Courses]
+      summary: Enroll learner in a course
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CourseId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollRequest'
+            example:
+              learnerAddress: "Example_StellaAddress"
+      responses:
+        "201":
+          description: Successfully Enrolled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrollResponse'
+              example:
+                courseId: "web1-101"
+                learnerAddress: "Example_StellaAddress"
+                enrolledAt: "2026-02-25T03:30:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  # ==== MILESTONES ====
+  /milestones/complete:
+    post:
+      tags: [Milestones]
+      summary: Validator submits milestone completion
+      security:
+        - bearerAuth: []
+      description: |
+        Marks a milestone as complete for a learner.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MilestoneCompleteRequest'
+            example:
+              courseId: "web1-101"
+              learnerAddress: "Example_StellaAddress"
+              milestoneId: "mile_001"
+              evidenceUri: "ipfs://example.../submission.json"
+      responses:
+        "200":
+          description: Successfully Completion Recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneCompleteResponse'
+              example:
+                courseId: "web1-101"
+                learnerAddress: "Example_StellaAddress"
+                milestoneId: "mile_001"
+                status: "VERIFIED"
+                lrnMinted: "150"
+                newLrnBalance: "1400"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  /milestones/{courseId}/{learnerAddress}:
+    get:
+      tags: [Milestones]
+      summary: Get milestone progress
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CourseIdPath'
+        - $ref: '#/components/parameters/LearnerAddressPath'
+      responses:
+        "200":
+          description: Successfully Retrieved Milestone Progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MilestoneProgress'
+              example:
+                courseId: "web1-101"
+                learnerAddress: "Example_StellaAddress"
+                completed:
+                  - milestoneId: "mile_001"
+                    completedAt: "2026-02-10T10:00:00Z"
+                  - milestoneId: "mile_002"
+                    completedAt: "2026-02-24T18:15:00Z"
+                remaining:
+                  - milestoneId: "mile_003"
+                    title: "Deploy a simple app"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  # ==== TREASURY ====
+  /treasury/balance:
+    get:
+      tags: [Treasury]
+      summary: Total USDC in treasury
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Successfully Retrieved Treasury Balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TreasuryBalance'
+              example:
+                currency: "USDC"
+                balance: "125000.50"
+                asOf: "2026-02-25T03:00:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+  
+  /treasury/donate:
+    post:
+      tags: [Treasury]
+      summary: Initiate a donation
+      security:
+        - bearerAuth: []
+      description: |
+        Initiates a donation to the community treasury. Depending on chain/wallet, the backend MAY return a payment intent or instructions.
+      requestBody: 
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DonationRequest'
+            example:
+              donorAddress: "Example_StellaAddress"
+              amount: "50"
+              currency: "USDC"
+              chain: "stellar"
+      responses:
+        "201":
+          description: Successfully Donation Initiated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DonationResponse'
+              example:
+                donationId: "dona_001"
+                status: "PENDING"
+                paymentUri: "stellar://payexample?to=TREASURY...&amount=50&asset=USDC"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+
+  # ==== PROPOSALS ====
   /proposals:
     get:
       tags: [Proposals]
@@ -169,10 +440,9 @@ paths:
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/PageSize'
-        - $ref: '#/components/parameters/Status'
       responses:
         "200":
-          description: Successfully listed proposal.
+          description: Successfully Listed Proposal.
           content:
             application/json:
               schema:
@@ -181,7 +451,7 @@ paths:
                 items:
                   - id: "prop_001"
                     scholarAddress: "Example_StellaAddress"
-                    title: "ZZ Bootcamp"
+                    title: "AZ Bootcamp Tuition"
                     requestedUsdc: "500"
                     status: "VOTING"
                     createdAt: "2026-02-20T12:00:00Z"
@@ -191,9 +461,189 @@ paths:
         "429":
           $ref: '#/components/responses/RateLimited'
 
+    post:
+      tags: [Proposals]
+      summary: Submit a new scholarship proposal
+      description: |
+        Submits a scholarship proposal to be voted on by Governance Token holders.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalCreateRequest'
+            example:
+              scholarAddress: "Example_StellaAddress"
+              title: "AZ Bootcamp Tuition"
+              goal: "Attend a 6-week AZ fundamentals bootcamp"
+              requestedUsdc: "500"
+              timeline:
+                startDate: "2026-03-02"
+                endDate: "2026-04-16"
+              milestones:
+                - title: "Enrollment confirmed"
+                  expectedDate: "2026-03-04"
+                  amountUsdc: "150"
+                - title: "Midterm project submission"
+                  expectedDate: "2026-03-26"
+                  amountUsdc: "175"
+                - title: "Final project completion"
+                  expectedDate: "2026-04-16"
+                  amountUsdc: "175"
+              reputation:
+                larnBalance: "1250"
+              proposalDocUri: "ipfs://example.../proposal.pdf"
+      responses:
+        "201":
+          description: Successfully Proposal Submitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+              example:
+                id: "prop_001"
+                scholarAddress: "Example_StellaAddress"
+                title: "AZ Bootcamp Tuition"
+                goal: "Attend a 6-week AZ fundamentals bootcamp"
+                requestedUsdc: "500"
+                status: "VOTING"
+                createdAt: "2026-02-25T03:40:00Z"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "429":
+          $ref: '#/components/responses/RateLimited'
 
+  /proposals/{id}:
+    get:
+      tags: [Proposals]
+      summary: Proposal details
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      responses:
+        "200":
+          description: Successfully Retrieved Proposal Detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+              example:
+                id: "prop_001"
+                scholarAddress: "Example_StellaAddress"
+                title: "AZ Bootcamp Tuition"
+                goal: "Attend a 6-week AZ fundamentals bootcamp"
+                requestedUsdc: "500"
+                status: "VOTING"
+                createdAt: "2026-02-20T12:00:00Z"
+                votes:
+                  yes: "1200"
+                  no: "300"
+                voting:
+                  endsAt: "2026-02-27T12:00:00Z"
+                  quorum: "1000"
+                  approvalThreshold: "0.6"
+        "401":
+          $ref: '#/components/responses/BadRequest'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+  
+  /proposals/{id}/vote:
+    post:
+      tags: [Proposals]
+      summary: Cast a governance vote
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProposalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+            example:
+              voterAddress: "Example_StellaAddress"
+              vote: "YES"
+              weight: "250"
+      responses:
+        "200":
+          description: Successfully Vote Recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResponse'
+              example:
+                proposalId: "prop_001"
+                voterAddress: "Example_StellaAddress"
+                vote: "YES"
+                weight: "250"
+                recordedAt: "2026-02-25T03:45:00Z"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "429":
+          $ref: '#/components/responses/RateLimited'
 
-
+  # ==== ESCROW ====
+  /escrow/{scholarAddress}:
+    get:
+      tags: [Escrow]
+      summary: Disbursement status for a scholar
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ScholarAddress'
+      responses:
+        "200":
+          description: Successfully Retrieved Escrow Status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowStatus'
+              example:
+                scholarAddress: "Example_StellaAddress"
+                proposalId: "prop_001"
+                totalApprovedUsdc: "500"
+                disbursedUsdc: "150"
+                remainingUsdc: "350"
+                tranches:
+                  - trancheId: "t_001"
+                    title: "Enrollment confirmed"
+                    amountUsdc: "150"
+                    status: "DISBURSED"
+                    disbursedAt: "2026-03-03T12:00:00Z"
+                  - trancheId: "t_002"
+                    title: "Midterm project sumission"
+                    amountUsdc: "175"
+                    status: "LOCKED"
+                  - trancheId: "t_003"
+                    title: "Final project completion"
+                    amountUsdc: "175"
+                    status: "LOCKED"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "429":
+          $ref: '#/components/responses/RateLimited'
 
 components:
   securitySchemes:
@@ -209,28 +659,35 @@ components:
       required: true
       schema:
         type: string
-      description: Laerner wallet address (e.g., Stellar publich key)
-
-    ScholarAddress:
-      name: scholarAddress
+      description: Laerner wallet address (e.g., Stellar public key)
+    
+    LearnerAddressPath:
+      name: learnerAddress
       in: path
       required: true
       schema:
         type: string
-      description: Scholar wallet address (e.g., Stellar public key)
-    
-    Status:
-      name: status
-      in: query
-      required: false
-      description: Filter by proposal status
+      description: Learner wallet address (e.g., Stellar public key)
+
+    CourseId:
+      name: id
+      in: path
+      required: true
       schema:
-        $ref: '#/components/schemas/ProposalStatus'
-      example: "VOTING"
+        type: string
+      description: Identifier
+    
+    CourseIdPath:
+      name: courseId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Course identifier
 
     Cursor:
       name: cursor
-      in: path
+      in: query
       required: false
       schema:
         type: string
@@ -248,6 +705,21 @@ components:
         default: 20
         description: Page size
 
+    ProposalId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Proposal identifier
+
+    ScholarAddress:
+      name: scholarAddress
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Scholar wallet address (e.g., Stellar public key)
 
   schemas:  
     # ---- Commom ----
@@ -281,7 +753,7 @@ components:
             message: "The request body is missing or invalid."
             details:
               field: "requestedUsdc"
-              reason: "Must be a positive number."
+              reason: "MUST be a positive number."
             requestId: "req_111xyz"
 
     # ---- Auth ----
@@ -340,6 +812,17 @@ components:
           type: string
           format: date-time
 
+    LearnerProgressResponse:
+      type: object
+      required: [learnerAddress, courses]
+      properties:
+        learnerAddress:
+          type: string
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/LearnerCourseProgress'
+
     LearnerCourseProgress:
       type: object
       required: [courseId, enrolledAt, completedMilestones, totlaMilestones, lastUpdatedAt]
@@ -357,6 +840,189 @@ components:
           type: string
           format: date-time
     
+    # ---- Courses ----
+    Course:
+      type: object
+      required: [id, title, description, totlaMilestones]
+      properties:
+        id:
+          type: string
+        title: 
+          type: string
+        description:
+          type: string
+        totlaMilestones:
+          type: integer
+
+    CourseList:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Course'
+        nextCursor:
+          type: string
+          nullable: true
+
+    CourseMilestone:
+      type: object
+      required: [milestoneId, title, lrnReward]
+      properties:
+        milestoneId:
+          type: string
+        title:
+          type: string
+        lrnReward:
+          type: string
+    
+    CourseDetail:
+      type: object
+      required: [id, title, description, milestones]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        milestones:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseMilestone'
+    
+    EnrollRequest:
+      type: object
+      required: [learnerAddress]
+      properties:
+        learnerAddress:
+          type: string
+    
+    EnrollResponse:
+      type: object
+      required: [courseId, learnerAddress, enrolledAt]
+      properties:
+        courseId:
+          type: string
+        learnerADdress:
+          type: string
+        enrolledAt:
+          type: string
+          format: date-time
+
+    # ---- Milestones ----
+    MilestoneCompleteRequest:
+      type: object
+      required: [courseId, learnerAddress, milestoneId]
+      properties:
+        courseId:
+          type: string
+        learnerAddress:
+          type: string
+        milestoneId:
+          type: string
+        evidenceUri:
+          type: string
+          nullable: true
+          description: OPTIONAL link to evidence (e.g., ipfs)
+    
+    MilestoneCompleteResponse:
+      type: object
+      required: [courseId, learnerAddress, milestoneId, status, lrnMinted, newLrnBalance]
+      properties:
+        courseId:
+          type: string
+        learnerAddress:
+          type: string
+        milestoneId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, VERIFIED, REJECTED]
+        lrnMinted:
+          type: string
+        newLrnBalance:
+          type: string
+    
+    MilestoneProgress:
+      type: object
+      required: [courseId, learnerAddress, completed, remaining]
+      properties:
+        courseId:
+          type: string
+        learnerAddress:
+          type: string
+        completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompletedMilestone'
+        remaining:
+          type: array
+          items:
+            $ref: '#/components/schemas/RemainingMilestone'
+
+    CompletedMilestone:
+      type: object
+      required: [milestoneId, completedAt]
+      properties:
+        milestoneId:
+          type: string
+        completedAt:
+          type: string
+          format: date-time
+    RemainingMilestone:
+      type: object
+      required: [milestoneId, title]
+      properties:
+        milestoneId:
+          type: string
+        title:
+          type: string        
+
+    # ---- Treasury ----
+    TreasuryBalance:
+      type: object
+      required: [currency, balance, asOf]
+      properties:
+        currency:
+          type: string
+          example: "USDC"
+        balance: 
+          type: string
+        asOf:
+          type: string
+          format: date-time
+    
+    DonationRequest:
+      type: object
+      required: [donorAddress, amount, currency]
+      properties:
+        donorAddress:
+          type: string
+        amount:
+          type: string
+        currency:
+          type: string
+          example: "USDC"
+        chain:
+          type: string
+          nullable: true
+          example: "Stellar"
+    
+    DonationResponse:
+      type: object
+      required: [donationId, status]
+      properties:
+        donationId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, FAILED]
+        paymentUri:
+          type: string
+          nullable: true
+
     # ---- Proposals ----
     ProposalStatus:
       type: string
@@ -392,7 +1058,6 @@ components:
           type: string
           format: date-time
 
-
     Proposal:
       type: object
       required: [id, scholarAddress, title, goal, requestedUsdc, status, createdAt]
@@ -424,9 +1089,7 @@ components:
           $ref: '#/components/schemas/VoteTally'
         voting:
           $ref: '#/components/schemas/VotingParams'
-
-
-    
+ 
     ProposalReputation:
       type: object
       properties:
@@ -473,7 +1136,97 @@ components:
           type: string
           description: Decimal fraction as string (e.g., "0.6")
 
-  
+    ProposalCreateRequest:
+      type: object
+      required: [scholarAddress, title, goal, requestedUsdc]
+      properties:
+        scholarAddress:
+          type: string
+        title:
+          type: string
+        goal:
+          type: string
+        requestedUsdc:
+          type: string
+        timeline:
+          $ref: '#/components/schemas/ProposalTimeline'
+        milestones:
+          $ref: '#/components/schemas/ProposalMilestone'
+        reputation:
+          $ref: '#/components/schemas/ProposalReputation'
+        proposalDocUri:
+          type: string
+          nullable: true
+    
+    VoteRequest:
+      type: object
+      required: [voterAddress, vote]
+      properties:
+        voterAddress:
+          type: string
+        vote:
+          type: string
+          enum: [YES, NO]
+        weight:
+          type: string
+          nullable: true
+          description: Optional client-provided weight (server MAY compute actual weight)
+
+    VoteResponse:
+      type: object
+      required: [proposalId, voterAddress, vote, weight, recordedAt]
+      properties:
+        proposalId:
+          type: string
+        voterAddress:
+          type: string
+        vote:
+          type: string
+          enum: [YES, NO]
+        weight:
+          type: string
+        recordedAt:
+          type: string
+          format: date-time
+
+    # ---- Escrow ----
+    EscrowStatus:
+      type: object
+      required: [scholarAddress, proposalId, totalApprovedUsdc, disbursedUsdc, remainingUsdc, tranches]
+      properties:
+        scholarAddress:
+          type: string
+        proposalId:
+          type: string
+        totalApprovedUsdc:
+          type: string
+        disbursedUsdc:
+          type: string
+        remainingUsdc:
+          type: string
+        tranches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tranche'
+    
+    Tranche:
+      type: object
+      required: [scholarAddress, title, amountUsdc, status]
+      properties:
+        trancheId:
+          type: string
+        title:
+          type: string
+        amountUsdc:
+          type: string
+        status:
+          type: string
+          enum: [LOCKED, READY, DISBURSED, RETURNED]
+        disbursedAt:
+          type: string
+          format: date-time
+          nullable: true
+
   responses:
     BadRequest:
       description: Bad Request
@@ -487,7 +1240,7 @@ components:
             message: "The request body is missing or invalid."
             details:
               field: "requestedUsdc"
-              reason: "Must be a positive number."
+              reason: "MUST be a positive number."
             requestId: "req_111xyz"
     Unauthorized:
       description: Unauthorized
