@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback } from "react"
 import { useToast } from "../components/Toast/ToastProvider"
-import { type Proposal } from "../types/contracts"
 import { ErrorCode, createAppError } from "../types/errors"
 import { type RawContractProposal, type Proposal } from "../types/governance"
 import { isUserRejection, parseError } from "../utils/errors"
@@ -77,11 +76,10 @@ export function useGovernance() {
 
 	const toProposalStatus = useCallback(
 		(status: unknown): Proposal["status"] => {
-			const normalized = String(status ?? "pending").toLowerCase()
-			if (normalized === "approved" || normalized === "passed")
-				return "approved"
-			if (normalized === "rejected") return "rejected"
-			return "pending"
+			const normalized = String(status ?? "active").toLowerCase()
+			if (normalized === "approved" || normalized === "passed") return "Passed"
+			if (normalized === "rejected") return "Rejected"
+			return "Active"
 		},
 		[],
 	)
@@ -92,27 +90,30 @@ export function useGovernance() {
 			fallbackStatus: Proposal["status"],
 		): Proposal => ({
 			id: Number(rawProposal.id ?? 0),
-			proposer: String(
+			title: String(rawProposal.program_name ?? rawProposal.title ?? ""),
+			description: String(
+				rawProposal.program_description ?? rawProposal.description ?? "",
+			),
+			author: String(
 				rawProposal.applicant ??
 					rawProposal.author ??
 					rawProposal.author_address ??
 					"",
 			),
-			amount: toBigIntSafe(rawProposal.amount ?? 0),
-			description: String(
-				rawProposal.program_description ?? rawProposal.description ?? "",
-			),
-			votes_for: toBigIntSafe(
+			votesFor: toBigIntSafe(
 				rawProposal.yes_votes ??
 					rawProposal.votes_for ??
 					rawProposal.votesFor ??
 					0,
 			),
-			votes_against: toBigIntSafe(
+			votesAgainst: toBigIntSafe(
 				rawProposal.no_votes ??
 					rawProposal.votes_against ??
 					rawProposal.votesAgainst ??
 					0,
+			),
+			endDate: Number(
+				rawProposal.end_date ?? rawProposal.endDate ?? rawProposal.deadline_ledger ?? 0,
 			),
 			status: toProposalStatus(rawProposal.status ?? fallbackStatus),
 		}),

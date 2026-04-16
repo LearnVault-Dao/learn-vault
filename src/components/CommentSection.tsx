@@ -52,7 +52,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 		setLoading(true)
 		try {
 			const res = await fetch(`${API_URL}/api/proposals/${proposalId}/comments`)
-			const data = await res.json()
+			const data = (await res.json()) as Comment[]
 			setComments(data)
 		} catch (err) {
 			console.error("Failed to fetch comments", err)
@@ -112,8 +112,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
 				setSubmissionStatus("Comment posted successfully.")
 				void fetchComments()
 			} else {
-				const err = await res.json()
-				setSubmissionError(err.error || "Failed to post comment.")
+				const err = (await res.json()) as { error?: string }
+				setSubmissionError(err.error ?? "Failed to post comment.")
 			}
 		} catch (err) {
 			console.error("Error posting comment", err)

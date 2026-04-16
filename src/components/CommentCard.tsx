@@ -117,8 +117,8 @@ const CommentCard: React.FC<CommentCardProps> = ({
 				setIsReplying(false)
 				onUpdate?.()
 			} else {
-				const err = await res.json().catch(() => ({}))
-				setReplyError(err.error || "Reply failed.")
+				const err = (await res.json().catch(() => ({}))) as { error?: string }
+				setReplyError(err.error ?? "Reply failed.")
 			}
 		} catch (err) {
 			console.error("Reply failed", err)

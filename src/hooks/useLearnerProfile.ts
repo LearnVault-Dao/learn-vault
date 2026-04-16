@@ -29,8 +29,8 @@ export function useLearnerProfile() {
 			})
 
 			if (!response.ok) {
-				const error = await response.json().catch(() => ({}))
-				throw new Error(error.error || "Failed to fetch learner profile")
+				const error = (await response.json().catch(() => ({}))) as { error?: string }
+				throw new Error(error.error ?? "Failed to fetch learner profile")
 			}
 
 			return response.json() as Promise<LearnerProfile>

@@ -46,13 +46,16 @@ const Profile: React.FC = () => {
 			})
 
 			if (!response.ok) {
-				const payload = await response.json().catch(() => ({}))
+				const payload = (await response.json().catch(() => ({}))) as {
+					message?: string
+					error?: string
+				}
 				throw new Error(
-					payload.message || payload.error || "Unable to load credentials",
+					payload.message ?? payload.error ?? "Unable to load credentials",
 				)
 			}
 
-			const data = await response.json()
+			const data = (await response.json()) as { data?: unknown[] }
 			setNfts(
 				Array.isArray(data.data)
 					? data.data.map((item: any) => ({

@@ -20,7 +20,7 @@ import { parseError } from "./util/error"
 	try {
 		const saved = localStorage.getItem("learnvault:theme")
 		const theme = saved
-			? JSON.parse(saved)
+			? (JSON.parse(saved) as string)
 			: window.matchMedia("(prefers-color-scheme: dark)").matches
 				? "dark"
 				: "light"
